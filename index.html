@@ -26,12 +26,16 @@ const ZHIPU_KEY = "b4ff7563b113457ea2f2e32fc3701f2d.gipphsslxToT7nyG";
 const ZHIPU_MODEL = "glm-3-turbo";
 const ZHIPU_API = "https://api.zhipuai.cn/v1/chat/completions";
 
-// 1. 爬取新浪财经A股专属新闻（只抓财经要闻）
+// ✅ 修复跨域：加CORS代理
+const CORS_PROXY = "https://api.allorigins.win/get?url=";
+
+// 1. 爬取新浪财经A股专属新闻（修复跨域版）
 async function getSinaFinanceNews(){
-    const url = "https://finance.sina.com.cn/roll/api.php?num=8&page=1";
-    const res = await fetch(url);
+    const targetUrl = encodeURIComponent("https://finance.sina.com.cn/roll/api.php?num=6&page=1");
+    const res = await fetch(CORS_PROXY + targetUrl);
     const json = await res.json();
-    return json.data.map(item => ({
+    const data = JSON.parse(json.contents);
+    return data.data.map(item => ({
         title: item.title,
         ctime: item.ctime,
         content: item.summary || item.content || item.title
@@ -107,7 +111,7 @@ async function runAnalysis(){
         }
         box.innerHTML += `<p class='warn'>⚠️ 本工具仅为数据参考，不构成任何投资建议，投资有风险，入市需谨慎</p>`;
     }catch(e){
-        box.innerHTML = `<p style="color:red">❌ 请求出错：${e.message}<br>苹果Safari跨域请换Chrome浏览器打开</p>`;
+        box.innerHTML = `<p style="color:red">❌ 请求出错：${e.message}<br>请检查网络或智普API密钥是否正确</p>`;
     }
 }
 </script>
