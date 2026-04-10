@@ -25,15 +25,14 @@ const ZHIPU_KEY = "461b5d10d6ac4c06abd47d6347e2e2af.G1yXmy7IeIJjrS3I";
 const ZHIPU_MODEL = "glm-3-turbo";
 const ZHIPU_API = "https://open.bigmodel.cn/api/paas/v4/chat/completions";
 
-// ✅ 修复跨域：添加免费CORS代理
-const CORS_PROXY = "https://api.allorigins.win/get?url=";
+// ✅ 换用更稳定的CORS代理，彻底解决跨域
+const CORS_PROXY = "https://corsproxy.io/?url=";
 
-// 1. 爬取新浪财经A股新闻（跨域修复版）
+// 1. 爬取新浪财经A股新闻（稳定跨域版）
 async function getSinaFinanceNews(){
     const targetUrl = encodeURIComponent("https://finance.sina.com.cn/roll/api.php?num=6&page=1");
     const res = await fetch(CORS_PROXY + targetUrl);
-    const json = await res.json();
-    const data = JSON.parse(json.contents);
+    const data = await res.json();
     return data.data.map(item => ({
         title: item.title,
         ctime: item.ctime,
