@@ -12,6 +12,8 @@
         .warn{color:red;font-size:12px;}
         .loading{color:#666;font-style:italic;}
     </style>
+    <!-- 引入JWT签名库，解决智谱鉴权问题 -->
+    <script src="https://cdn.jsdelivr.net/npm/jsonwebtoken@9.0.2/build/jwt-browser.min.js"></script>
 </head>
 <body>
     <h2>📈 新浪财经 | 智普AI低位潜伏选股</h2>
@@ -20,19 +22,32 @@
     <div id="box"></div>
 
 <script>
-// 已填好你的完整智谱API密钥
-const ZHIPU_KEY = "461b5d10d6ac4c06abd47d6347e2e2af.G1yXmy7IeIJjrS3I";
+// 你的智谱API密钥（ID.Secret格式）
+const ZHIPU_API_KEY = "461b5d10d6ac4c06abd47d6347e2e2af.G1yXmy7IeIJjrS3I";
 const ZHIPU_MODEL = "glm-3-turbo";
 const ZHIPU_API = "https://open.bigmodel.cn/api/paas/v4/chat/completions";
 
-// ✅ 换用更稳定的CORS代理，彻底解决跨域
-const CORS_PROXY = "https://corsproxy.io/?url=";
+// CORS代理，解决跨域问题
+const CORS_PROXY = "https://api.allorigins.win/get?url=";
 
-// 1. 爬取新浪财经A股新闻（稳定跨域版）
+// 智谱JWT鉴权生成（解决格式报错核心）
+function generateZhipuToken(apiKey, expSeconds = 3600) {
+    const [id, secret] = apiKey.split(".");
+    const now = Math.floor(Date.now() / 1000);
+    const payload = {
+        api_key: id,
+        exp: now + expSeconds,
+        timestamp: now
+    };
+    return jwt.sign(payload, secret, { algorithm: "HS256", header: { alg: "HS256", sign_type: "SIGN" } });
+}
+
+// 1. 爬取新浪财经A股新闻（跨域修复版）
 async function getSinaFinanceNews(){
     const targetUrl = encodeURIComponent("https://finance.sina.com.cn/roll/api.php?num=6&page=1");
     const res = await fetch(CORS_PROXY + targetUrl);
-    const data = await res.json();
+    const json = await res.json();
+    const data = JSON.parse(json.contents);
     return data.data.map(item => ({
         title: item.title,
         ctime: item.ctime,
@@ -40,8 +55,9 @@ async function getSinaFinanceNews(){
     }));
 }
 
-// 2. 智普AI双筛分析：新闻利好 + 低位潜伏技术指标
+// 2. 智普AI双筛分析（修复鉴权版）
 async function analyzeByZhipu(news){
+    const token = generateZhipuToken(ZHIPU_API_KEY);
     const prompt = `
 你是A股低位潜伏选股专家，严格按以下规则分析这篇新浪财经新闻：
 
@@ -56,7 +72,7 @@ async function analyzeByZhipu(news){
 1. 流通市值：30亿 < 市值 < 120亿（中小盘，避开大盘股）
 2. 日换手率：1.5% < 换手率 < 5%（温和放量，不追高）
 3. 成交量：5日均量 > 10日均量（量能金叉，资金进场）
-4. 均线：MA5与MA20粘合，ABS(MA5-MA20)/MA20 < 3%（低位蓄势）
+4. 均线：MA5与MA20粘合，差值<3%（低位蓄势）
 5. 近3日涨幅 < 3%（绝对低位，未提前大涨，适合埋伏）
 
 【第三步：输出格式（严格按此结构）】
@@ -76,7 +92,7 @@ async function analyzeByZhipu(news){
     const resp = await fetch(ZHIPU_API,{
         method:"POST",
         headers:{
-            "Authorization":"Bearer "+ZHIPU_KEY,
+            "Authorization":"Bearer "+token,
             "Content-Type":"application/json"
         },
         body:JSON.stringify({
@@ -86,6 +102,7 @@ async function analyzeByZhipu(news){
         })
     });
     const data = await resp.json();
+    if(data.error) throw new Error(data.error.message);
     return data.choices[0].message.content;
 }
 
