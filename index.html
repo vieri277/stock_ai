@@ -1,0 +1,115 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+    <title>新浪财经·智普AI低位潜伏选股</title>
+    <style>
+        body{padding:15px;font-family:-apple-system,BlinkMacSystemFont,sans-serif;background:#f5f7fa;}
+        button{background:#1677ff;color:#fff;border:none;padding:12px 20px;border-radius:8px;font-size:16px;}
+        .news-card{background:#fff;padding:12px;border-radius:8px;margin:10px 0;border-left:4px #4096ff solid;}
+        .ai-result{background:#f0fdf4;padding:12px;border-radius:8px;margin:10px 0;border-left:4px #27ae60 solid;}
+        .warn{color:red;font-size:12px;}
+        .loading{color:#666;font-style:italic;}
+        .stock-item{background:#fff;padding:10px;margin:8px 0;border-radius:6px;border-left:3px solid #f39c12;}
+    </style>
+</head>
+<body>
+    <h2>📈 新浪财经 | 智普AI低位潜伏选股</h2>
+    <p class="warn">⚠️ 风险提示：仅数据分析，不构成任何投资建议</p>
+    <button onclick="runAnalysis()">开始双筛选股（新闻+技术面）</button>
+    <div id="box"></div>
+
+<script>
+// 已填好你的智普API密钥
+const ZHIPU_KEY = "b4ff7563b113457ea2f2e32fc3701f2d.gipphsslxToT7nyG";
+const ZHIPU_MODEL = "glm-3-turbo";
+const ZHIPU_API = "https://api.zhipuai.cn/v1/chat/completions";
+
+// 1. 爬取新浪财经A股专属新闻（只抓财经要闻）
+async function getSinaFinanceNews(){
+    const url = "https://finance.sina.com.cn/roll/api.php?num=8&page=1";
+    const res = await fetch(url);
+    const json = await res.json();
+    return json.data.map(item => ({
+        title: item.title,
+        ctime: item.ctime,
+        content: item.summary || item.content || item.title
+    }));
+}
+
+// 2. 智普AI双筛分析：新闻利好 + 潜伏技术指标
+async function analyzeByZhipu(news){
+    const prompt = `
+你是A股低位潜伏选股专家，严格按以下规则分析这篇新浪财经新闻：
+
+【第一步：新闻筛选】
+1. 提取新闻关联的所有A股上市公司名称+股票代码
+2. 判断事件类型：政策利好/业绩超预期/大额订单/技术突破/并购重组/利空暴雷
+3. 判断舆情情绪：极强正面/正面/中性/负面
+4. 只保留【极强正面/正面】的利好标的，直接剔除中性/负面标的
+
+【第二步：潜伏技术面硬筛选（必须全部满足）】
+对保留的标的，严格按以下条件筛选：
+1. 流通市值：30亿 < 市值 < 120亿（中小盘，避开大盘股）
+2. 日换手率：1.5% < 换手率 < 5%（温和放量，不追高）
+3. 成交量：5日均量 > 10日均量（量能金叉，资金进场）
+4. 均线：MA5与MA20粘合，ABS(MA5-MA20)/MA20 < 3%（低位蓄势）
+5. 近3日涨幅 < 3%（绝对低位，未提前大涨，适合埋伏）
+
+【第三步：输出格式（严格按此结构）】
+✅ 【符合双筛标的】（只列满足所有条件的股票，不满足的直接不提）
+- 股票名称+代码：
+- 利好事件：
+- 技术面达标情况：（逐条说明是否满足5个条件）
+- 埋伏评级：高/中/低
+- 潜伏逻辑：（结合新闻利好+技术面低位，简明说明）
+- 核心风险：（必须提示潜在风险）
+
+❌ 【不符合标的】（只列满足新闻利好但不满足技术面的，说明不满足的条件）
+
+新闻标题：${news.title}
+新闻内容：${news.content}
+    `;
+    const resp = await fetch(ZHIPU_API,{
+        method:"POST",
+        headers:{
+            "Authorization":"Bearer "+ZHIPU_KEY,
+            "Content-Type":"application/json"
+        },
+        body:JSON.stringify({
+            model: ZHIPU_MODEL,
+            messages: [{role:"user", content: prompt}],
+            temperature: 0.1
+        })
+    });
+    const data = await resp.json();
+    return data.choices[0].message.content;
+}
+
+// 3. 主运行流程
+async function runAnalysis(){
+    const box = document.getElementById("box");
+    box.innerHTML = "<p class='loading'>正在爬取新浪财经A股新闻，启动双筛选股...</p>";
+    try{
+        const newsList = await getSinaFinanceNews();
+        box.innerHTML = "";
+        for(let item of newsList){
+            box.innerHTML += `
+            <div class="news-card">
+                <h4>${item.title}</h4>
+                <small>发布时间：${item.ctime}</small>
+                <p class='loading'>智普AI双筛分析中（新闻+技术面）...</p>
+            </div>
+            `;
+            const aiText = await analyzeByZhipu(item);
+            box.innerHTML += `<div class="ai-result">🤖智普AI双筛选股结论：<br>${aiText}</div><hr>`;
+        }
+        box.innerHTML += `<p class='warn'>⚠️ 本工具仅为数据参考，不构成任何投资建议，投资有风险，入市需谨慎</p>`;
+    }catch(e){
+        box.innerHTML = `<p style="color:red">❌ 请求出错：${e.message}<br>苹果Safari跨域请换Chrome浏览器打开</p>`;
+    }
+}
+</script>
+</body>
+</html>
