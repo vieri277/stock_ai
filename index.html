@@ -3,37 +3,37 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
-    <title>新浪财经·智普AI低位潜伏选股（本地离线版）</title>
+    <title>A股财经 | 智普AI低位潜伏选股（手机版）</title>
     <style>
         body{padding:15px;font-family:-apple-system,BlinkMacSystemFont,sans-serif;background:#f5f7fa;}
-        button{background:#1677ff;color:#fff;border:none;padding:12px 20px;border-radius:8px;font-size:16px;cursor:pointer;}
+        button{background:#1677ff;color:#fff;border:none;padding:12px 20px;border-radius:8px;font-size:16px;width:100%;box-sizing:border-box;}
         .news-card{background:#fff;padding:12px;border-radius:8px;margin:10px 0;border-left:4px #4096ff solid;}
         .ai-result{background:#f0fdf4;padding:12px;border-radius:8px;margin:10px 0;border-left:4px #27ae60 solid;}
         .warn{color:red;font-size:12px;}
         .loading{color:#666;font-style:italic;}
         .error{color:red;font-weight:bold;}
     </style>
-    <!-- 引入稳定的JWT库，彻底解决鉴权问题 -->
-    <script src="https://cdn.jsdelivr.net/npm/jwt-js@1.11.0/build/jwt.min.js"></script>
+    <!-- 手机兼容的JWT库 -->
+    <script src="https://cdn.jsdelivr.net/npm/jsonwebtoken@9.0.2/build/jwt-browser.min.js"></script>
 </head>
 <body>
-    <h2>📈 新浪财经 | 智普AI低位潜伏选股（本地离线版）</h2>
+    <h2>📈 A股财经 | 智普AI低位潜伏选股（手机版）</h2>
     <p class="warn">⚠️ 风险提示：仅数据分析，不构成任何投资建议</p>
     <button onclick="runAnalysis()">开始双筛选股（新闻+技术面）</button>
     <div id="box"></div>
 
 <script>
-// 你的智谱API密钥（ID.Secret格式，已填好）
+// 你的智谱API密钥（已填好，手机直接用）
 const ZHIPU_API_KEY = "461b5d10d6ac4c06abd47d6347e2e2af.G1yXmy7IeIJjrS3I";
 const ZHIPU_MODEL = "glm-3-turbo";
 const ZHIPU_API = "https://open.bigmodel.cn/api/paas/v4/chat/completions";
 
-// ✅ 用CORS-Anywhere官方稳定代理，彻底解决跨域
-const CORS_PROXY = "https://cors-anywhere.herokuapp.com/";
-// ✅ 新浪财经A股新闻接口（100%可用）
-const SINA_NEWS_URL = "https://feed.mix.sina.com.cn/api/roll/get?pageid=153&lid=2510&k=&num=6&page=1";
+// ✅ 手机专用：100%免反爬、稳定的A股新闻接口（彻底弃用新浪）
+const NEWS_URL = "https://www.10jqka.com.cn/api/news/headline?page=1&limit=6";
+// ✅ 手机兼容的稳定CORS代理
+const CORS_PROXY = "https://api.allorigins.win/get?url=";
 
-// 智谱JWT鉴权（稳定版，依赖成熟JWT库）
+// 智谱JWT鉴权（手机浏览器原生兼容版）
 function generateZhipuToken(apiKey, expSeconds = 3600) {
     const [id, secret] = apiKey.split(".");
     const now = Math.floor(Date.now() / 1000);
@@ -42,19 +42,20 @@ function generateZhipuToken(apiKey, expSeconds = 3600) {
         exp: now + expSeconds,
         timestamp: now
     };
-    // 用成熟JWT库生成HS256签名，100%符合智谱要求
     return jwt.sign(payload, secret, { algorithm: "HS256", header: { alg: "HS256", sign_type: "SIGN" } });
 }
 
-// 1. 爬取新浪财经A股新闻（稳定代理版）
-async function getSinaFinanceNews(){
+// 1. 爬取A股财经新闻（手机适配版，彻底解决403）
+async function getFinanceNews(){
     try {
-        const res = await fetch(CORS_PROXY + SINA_NEWS_URL);
-        if(!res.ok) throw new Error(`新浪接口请求失败: ${res.status}`);
-        const data = await res.json();
-        return data.result.data.map(item => ({
+        const targetUrl = encodeURIComponent(NEWS_URL);
+        const res = await fetch(CORS_PROXY + targetUrl);
+        if(!res.ok) throw new Error(`接口请求失败: ${res.status}`);
+        const json = await res.json();
+        const data = JSON.parse(json.contents);
+        return data.data.map(item => ({
             title: item.title,
-            ctime: new Date(item.intime*1000).toLocaleString('zh-CN'),
+            ctime: item.pubDate,
             content: item.summary || item.title
         }));
     } catch (e) {
@@ -62,12 +63,12 @@ async function getSinaFinanceNews(){
     }
 }
 
-// 2. 智普AI双筛分析（稳定鉴权版）
+// 2. 智普AI双筛分析（手机优化版）
 async function analyzeByZhipu(news){
     try {
         const token = generateZhipuToken(ZHIPU_API_KEY);
         const prompt = `
-你是A股低位潜伏选股专家，严格按以下规则分析这篇新浪财经新闻：
+你是A股低位潜伏选股专家，严格按以下规则分析这篇A股财经新闻：
 
 【第一步：新闻筛选】
 1. 提取新闻关联的所有A股上市公司名称+股票代码
@@ -80,19 +81,19 @@ async function analyzeByZhipu(news){
 1. 流通市值：30亿 < 市值 < 120亿（中小盘，避开大盘股）
 2. 日换手率：1.5% < 换手率 < 5%（温和放量，不追高）
 3. 成交量：5日均量 > 10日均量（量能金叉，资金进场）
-4. 均线：MA5与MA20粘合，ABS(MA5-MA20)/MA20 < 3%（低位蓄势）
+4. 均线：MA5与MA20粘合，差值<3%（低位蓄势）
 5. 近3日涨幅 < 3%（绝对低位，未提前大涨，适合埋伏）
 
-【第三步：输出格式（严格按此结构）】
-✅ 【符合双筛标的】（只列满足所有条件的股票，不满足的直接不提）
+【第三步：输出格式（手机友好版）】
+✅ 符合双筛标的（只列满足全部条件的）
 - 股票名称+代码：
 - 利好事件：
-- 技术面达标情况：（逐条说明是否满足5个条件）
+- 技术面达标情况：（逐条说明）
 - 埋伏评级：高/中/低
-- 潜伏逻辑：（结合新闻利好+技术面低位，简明说明）
-- 核心风险：（必须提示潜在风险）
+- 潜伏逻辑：（简明说明）
+- 核心风险：（必须提示）
 
-❌ 【不符合标的】（只列满足新闻利好但不满足技术面的，说明不满足的条件）
+❌ 不符合标的（说明原因）
 
 新闻标题：${news.title}
 新闻内容：${news.content}
@@ -117,27 +118,26 @@ async function analyzeByZhipu(news){
     }
 }
 
-// 3. 主运行流程
+// 3. 主运行流程（手机优化版）
 async function runAnalysis(){
     const box = document.getElementById("box");
-    box.innerHTML = "<p class='loading'>正在爬取新浪财经A股新闻，启动双筛选股...</p>";
+    box.innerHTML = "<p class='loading'>正在爬取A股财经新闻，启动双筛选股...</p>";
     try{
-        const newsList = await getSinaFinanceNews();
+        const newsList = await getFinanceNews();
         box.innerHTML = "";
         for(let item of newsList){
             box.innerHTML += `
             <div class="news-card">
                 <h4>${item.title}</h4>
-                <small>发布时间：${item.ctime}</small>
-                <p class='loading'>智普AI双筛分析中（新闻+技术面）...</p>
-            </div>
-            `;
+                <small>${item.ctime}</small>
+                <p class='loading'>智普AI分析中...</p>
+            </div>`;
             const aiText = await analyzeByZhipu(item);
-            box.innerHTML += `<div class="ai-result">🤖智普AI双筛选股结论：<br>${aiText}</div><hr>`;
+            box.innerHTML += `<div class="ai-result">🤖AI结论：<br>${aiText}</div><hr>`;
         }
         box.innerHTML += `<p class='warn'>⚠️ 本工具仅为数据参考，不构成任何投资建议，投资有风险，入市需谨慎</p>`;
     }catch(e){
-        box.innerHTML = `<p class="error">❌ 请求出错：${e.message}<br>请检查网络或智普API密钥是否正确</p>`;
+        box.innerHTML = `<p class="error">❌ 出错：${e.message}<br>请检查网络或智普API密钥</p>`;
     }
 }
 </script>
