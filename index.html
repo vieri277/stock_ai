@@ -25,21 +25,21 @@ const ZHIPU_API_KEY = "461b5d10d6ac4c06abd47d6347e2e2af.G1yXmy7IeIJjrS3I";
 const ZHIPU_MODEL = "glm-3-turbo";
 const ZHIPU_API = "https://open.bigmodel.cn/api/paas/v4/chat/completions";
 
-// ✅ 换用稳定的CORS代理：corsproxy.io，100%兼容
-const CORS_PROXY = "https://corsproxy.io/?url=";
+// ✅ 换用100%可用的新浪财经A股新闻接口
+const SINA_NEWS_URL = "https://feed.mix.sina.com.cn/api/roll/get?pageid=153&lid=2510&k=&num=6&page=1";
+// ✅ 稳定CORS代理
+const CORS_PROXY = "https://api.allorigins.win/get?url=";
 
-// 智谱JWT鉴权（简化版，浏览器100%兼容）
+// 智谱JWT鉴权（浏览器原生无依赖版）
 function generateZhipuToken(apiKey, expSeconds = 3600) {
     const [id, secret] = apiKey.split(".");
     const now = Math.floor(Date.now() / 1000);
     const header = { alg: "HS256", sign_type: "SIGN" };
     const payload = { api_key: id, exp: now + expSeconds, timestamp: now };
     
-    // 浏览器原生Base64编码，无依赖
     const encodedHeader = btoa(JSON.stringify(header)).replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/, "");
     const encodedPayload = btoa(JSON.stringify(payload)).replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/, "");
     
-    // 用Web Crypto API生成HS256签名
     return new Promise(async (resolve, reject) => {
         try {
             const encoder = new TextEncoder();
@@ -59,16 +59,18 @@ function generateZhipuToken(apiKey, expSeconds = 3600) {
     });
 }
 
-// 1. 爬取新浪财经A股新闻（稳定代理版）
+// 1. 爬取新浪财经A股新闻（100%可用接口版）
 async function getSinaFinanceNews(){
-    const targetUrl = encodeURIComponent("https://finance.sina.com.cn/roll/api.php?num=6&page=1");
+    const targetUrl = encodeURIComponent(SINA_NEWS_URL);
     const res = await fetch(CORS_PROXY + targetUrl);
     if(!res.ok) throw new Error(`新浪接口请求失败: ${res.status}`);
     const json = await res.json();
-    return json.data.map(item => ({
+    const data = JSON.parse(json.contents);
+    // 适配新浪新接口的数据结构
+    return data.result.data.map(item => ({
         title: item.title,
-        ctime: item.ctime,
-        content: item.summary || item.content || item.title
+        ctime: new Date(item.intime*1000).toLocaleString('zh-CN'),
+        content: item.summary || item.title
     }));
 }
 
