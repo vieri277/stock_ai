@@ -11,7 +11,6 @@
         .ai-result{background:#f0fdf4;padding:12px;border-radius:8px;margin:10px 0;border-left:4px #27ae60 solid;}
         .warn{color:red;font-size:12px;}
         .loading{color:#666;font-style:italic;}
-        .stock-item{background:#fff;padding:10px;margin:8px 0;border-radius:6px;border-left:3px solid #f39c12;}
     </style>
 </head>
 <body>
@@ -21,15 +20,15 @@
     <div id="box"></div>
 
 <script>
-// 已填好你的智普API密钥
-const ZHIPU_KEY = "b4ff7563b113457ea2f2e32fc3701f2d.gipphsslxToT7nyG";
+// 已填好你的完整智谱API密钥
+const ZHIPU_KEY = "461b5d10d6ac4c06abd47d6347e2e2af.G1yXmy7IeIJjrS3I";
 const ZHIPU_MODEL = "glm-3-turbo";
-const ZHIPU_API = "https://api.zhipuai.cn/v1/chat/completions";
+const ZHIPU_API = "https://open.bigmodel.cn/api/paas/v4/chat/completions";
 
-// ✅ 修复跨域：加CORS代理
+// ✅ 修复跨域：添加免费CORS代理
 const CORS_PROXY = "https://api.allorigins.win/get?url=";
 
-// 1. 爬取新浪财经A股专属新闻（修复跨域版）
+// 1. 爬取新浪财经A股新闻（跨域修复版）
 async function getSinaFinanceNews(){
     const targetUrl = encodeURIComponent("https://finance.sina.com.cn/roll/api.php?num=6&page=1");
     const res = await fetch(CORS_PROXY + targetUrl);
@@ -42,7 +41,7 @@ async function getSinaFinanceNews(){
     }));
 }
 
-// 2. 智普AI双筛分析：新闻利好 + 潜伏技术指标
+// 2. 智普AI双筛分析：新闻利好 + 低位潜伏技术指标
 async function analyzeByZhipu(news){
     const prompt = `
 你是A股低位潜伏选股专家，严格按以下规则分析这篇新浪财经新闻：
